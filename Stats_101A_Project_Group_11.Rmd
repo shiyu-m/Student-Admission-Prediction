@@ -1,0 +1,200 @@
+---
+title: "Stats 101A Project"
+author: "Group 11"
+date: "2023-02-28"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Lecture 1, Section 1B, Group 11: Shiyu Murashima, Andrew Chen, Connie Ma, Daniel Kao, Rebekah Limb, Zoey Meng
+
+## Loading in Data
+```{r}
+# change to your file directory
+data <- read.csv("/Users/ShiyuMurashima/Downloads/archive/Admission_Predict_Ver1.1.csv")
+data <- data[,c(-1)] # removed Serial Number column
+attach(data)
+```
+
+## Correlation Matrix
+```{r}
+cor(data)
+pairs(data)
+```
+
+## Summary Statistics
+```{r}
+summary(data)
+
+# standard deviations
+sd(GRE.Score)
+sd(TOEFL.Score)
+sd(University.Rating)
+sd(SOP)
+sd(LOR)
+sd(CGPA)
+sd(Research)
+sd(Chance.of.Admit)
+```
+
+## Full Model
+```{r}
+m1 <- lm(Chance.of.Admit ~ GRE.Score + TOEFL.Score + University.Rating + SOP + 
+           LOR + CGPA + Research)
+summary(m1)
+anova(m1)
+```
+
+```{r}
+par(mfrow = c(2, 2))
+plot(m1)
+```
+
+## Box-Cox Power Transformation
+```{r}
+library(car)
+# removed Research categorical column (0 returns -inf)
+summary(powerTransform(cbind(GRE.Score, TOEFL.Score, University.Rating, SOP, LOR,
+                             CGPA, Chance.of.Admit) ~ 1))
+```
+
+## Inverse Response Plot
+```{r}
+#inverse response plot
+invResPlot(m1)
+```
+
+## Y Transformed
+```{r}
+m2 <- lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + University.Rating + SOP + 
+           LOR + CGPA + Research)
+summary(m2)
+
+par(mfrow = c(2, 2))
+plot(m2)
+```
+
+## X and Y Transformed
+```{r}
+t1 <- GRE.Score^5.2354 
+t2 <- TOEFL.Score^2.2176
+t3 <- University.Rating^0.9145
+t4 <- SOP^1.3312
+t5 <- LOR^1.2129
+t6 <- CGPA^3.2932
+t7 <- Research
+
+m3 <- lm(data[,8]^2.5597 ~ t1 + t2 + t3 + t4 + t5 + t6 + t7)
+summary(m3)
+
+par(mfrow = c(2, 2))
+plot(m3)
+```
+
+## Checking Validity (omit)
+```{r}
+# stanres1 <- rstandard(m2)
+# par(mfrow = c(2, 3))
+# plot(log(GRE.Score), stanres1)
+# plot(log(TOEFL.Score), stanres1)
+# plot(log(University.Rating), stanres1)
+# plot(log(SOP), stanres1)
+# plot(log(LOR), stanres1)
+# plot(log(CGPA), stanres1)
+# plot(log(Research), stanres1)
+```
+
+## AV Plots and VIF
+```{r}
+par(mfrow = c(2, 4))
+avPlot(m2, variable = GRE.Score, ask = FALSE)
+avPlot(m2, variable = TOEFL.Score, ask = FALSE)
+avPlot(m2, variable = University.Rating, ask = FALSE)
+avPlot(m2, variable = SOP, ask = FALSE)
+avPlot(m2, variable = LOR, ask = FALSE)
+avPlot(m2, variable = CGPA, ask = FALSE)
+avPlot(m2, variable = Research, ask = FALSE)
+
+vif(m2)
+```
+
+## Method of All Subsets: R^2adj and BIC
+```{r}
+library(leaps)
+
+X <- cbind(GRE.Score, TOEFL.Score, University.Rating, SOP, LOR, CGPA, Research)
+b <- regsubsets(as.matrix(X), data[, 8]^2.654852)
+c <- summary(b)
+
+cbind(c$which, round(cbind(adjr2=c$adjr2, bic=c$bic), 3))
+
+# Radj2: Best with SOP or none removed
+# BIC: Best with SOP removed
+```
+
+## Method of All Subsets: AIC
+```{r}
+extractAIC(m2)[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + University.Rating + 
+                LOR + CGPA + Research))[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + LOR + CGPA + 
+                Research))[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ TOEFL.Score + University.Rating + CGPA + 
+                Research))[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + University.Rating + CGPA))[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + CGPA))[2]
+extractAIC(lm(Chance.of.Admit^2.654852 ~ CGPA))[2]
+# Best with SOP removed
+```
+
+## Method of All Subsets: AICc
+```{r}
+extractAIC(m2)[2] + 2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + University.Rating + 
+                LOR + CGPA + Research))[2] + 2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + LOR + CGPA + 
+                Research))[2] + 2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ TOEFL.Score + University.Rating + CGPA + 
+                Research))[2] + 2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + University.Rating + CGPA))[2] + 
+  2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ GRE.Score + CGPA))[2] + 
+  2*(7+2) * (7+3) / (nrow(data)-7-1)
+extractAIC(lm(Chance.of.Admit^2.654852 ~ CGPA))[2] + 2*(7+2) * (7+3) / (nrow(data)-7-1)
+# Best with SOP removed
+```
+
+## Forward Stepwise: AIC
+```{r}
+forwardAIC <- step(lm(Chance.of.Admit^2.654852 ~ 1), 
+                   scope = list(lower = ~ 1,
+                                upper = ~ GRE.Score + TOEFL.Score + University.Rating + 
+                                  SOP + LOR + CGPA + Research),
+                   direction = "forward")
+# Best with SOP removed
+```
+
+## Backward Stepwise: AIC
+```{r}
+backAIC <- step(m2, direction = "backward")
+# Best with SOP removed
+```
+
+## Reduced Model (SOP Removed)
+```{r}
+m4 <- lm(Chance.of.Admit^2.654852 ~ GRE.Score + TOEFL.Score + University.Rating + 
+           LOR + CGPA + Research)
+anova(m4, m2)
+```
+
+## Final Model
+```{r}
+summary(m4)
+anova(m4)
+```
+
+```{r}
+par(mfrow = c(2, 2))
+plot(m4)
+```
